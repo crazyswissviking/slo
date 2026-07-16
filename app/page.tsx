@@ -47,6 +47,7 @@ export default function Erfassung() {
   const [zeigeBestaetigung, setZeigeBestaetigung] = useState(false);
   const [speichert, setSpeichert] = useState(false);
   const [speicherFehler, setSpeicherFehler] = useState("");
+  const [zeigeErfolg, setZeigeErfolg] = useState(false);
 
   // Standard-Gegner beim Laden holen
   useEffect(() => {
@@ -97,6 +98,8 @@ export default function Erfassung() {
       setGeburtsdatum("");
       setFehler({});
       setZeigeBestaetigung(false);
+      setZeigeErfolg(true);
+      setTimeout(() => setZeigeErfolg(false), 3000);
     } catch (e) {
       setSpeicherFehler(
         e instanceof Error
@@ -241,6 +244,21 @@ export default function Erfassung() {
                 {speichert ? "Wird gespeichert …" : "Ja, Daten speichern"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {zeigeErfolg && (
+        <div className="erfolgOverlay" role="status" aria-live="polite">
+          <div className="erfolgKreis">
+            <svg
+              className="erfolgHaken"
+              viewBox="0 0 52 52"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle className="erfolgKreisLinie" cx="26" cy="26" r="24" />
+              <path className="erfolgHakenLinie" d="M14 27l8 8 16-16" />
+            </svg>
           </div>
         </div>
       )}

@@ -354,3 +354,90 @@ body {
   font-weight: 400;
   color: var(--grau);
 }
+
+/* --- Erfolgs-Anzeige nach dem Speichern (3 Sekunden) --- */
+.erfolgOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 26, 30, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 60;
+  animation: erfolgEinausblenden 3s ease forwards;
+}
+
+.erfolgKreis {
+  background: #fff;
+  border-radius: 50%;
+  width: 96px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+}
+
+.erfolgHaken {
+  width: 60px;
+  height: 60px;
+}
+
+.erfolgKreisLinie {
+  fill: none;
+  stroke: #2e8b3d;
+  stroke-width: 3;
+  stroke-dasharray: 151;
+  stroke-dashoffset: 151;
+  animation: erfolgKreisZeichnen 0.4s ease-out forwards;
+}
+
+.erfolgHakenLinie {
+  fill: none;
+  stroke: #2e8b3d;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 30;
+  stroke-dashoffset: 30;
+  animation: erfolgHakenZeichnen 0.3s 0.35s ease-out forwards;
+}
+
+@keyframes erfolgKreisZeichnen {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes erfolgHakenZeichnen {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes erfolgEinausblenden {
+  0% {
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .erfolgKreisLinie,
+  .erfolgHakenLinie {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .erfolgOverlay {
+    animation: none;
+  }
+}
