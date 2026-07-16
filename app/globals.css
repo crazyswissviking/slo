@@ -1,0 +1,356 @@
+@import url("https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600&display=swap");
+
+:root {
+  --rot: #c8102e;
+  --dunkel: #1a1a1e;
+  --grau: #5e5e66;
+  --linie: #e4e2de;
+  --hintergrund: #f2f0ec;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--hintergrund);
+  color: var(--dunkel);
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px 40px;
+}
+
+/* --- Ticket-Kopf --- */
+.ticket {
+  width: 100%;
+  max-width: 480px;
+  background: var(--rot);
+  color: #fff;
+  border-radius: 10px;
+  padding: 20px 22px 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 14px rgba(200, 16, 46, 0.25);
+}
+.ticketTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  margin-bottom: 4px;
+}
+.ticket h1 {
+  font-family: "Archivo Black", "Inter", sans-serif;
+  font-size: 30px;
+  margin: 0;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+.ticketStub {
+  text-align: right;
+  border-left: 1px dashed rgba(255, 255, 255, 0.5);
+  padding-left: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.stubLabel {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.8;
+}
+.stubValue {
+  font-family: "Archivo Black", sans-serif;
+  font-size: 16px;
+}
+.perforation {
+  border-top: 2px dashed rgba(255, 255, 255, 0.45);
+  margin-top: 14px;
+}
+.ticketSub {
+  font-size: 13.5px;
+  margin: 12px 0 0;
+  opacity: 0.95;
+  line-height: 1.45;
+}
+
+/* --- Karte / Formular --- */
+.card {
+  width: 100%;
+  max-width: 480px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 22px 22px 24px;
+  border: 1px solid var(--linie);
+}
+.card h2 {
+  font-family: "Archivo Black", "Inter", sans-serif;
+  font-size: 18px;
+  margin: 0 0 18px;
+}
+.anzahl {
+  font-family: "Inter", sans-serif;
+  font-weight: 500;
+  color: var(--grau);
+}
+
+.feld {
+  margin-bottom: 16px;
+}
+.feld label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--grau);
+  margin-bottom: 6px;
+}
+
+.input {
+  width: 100%;
+  padding: 11px 12px;
+  font-size: 15px;
+  font-family: "Inter", system-ui, sans-serif;
+  border: 1.5px solid var(--linie);
+  border-radius: 7px;
+  background: #fcfbfa;
+  color: var(--dunkel);
+  transition: border-color 0.15s;
+}
+.input:focus {
+  outline: none;
+  border-color: var(--rot);
+  background: #fff;
+}
+
+.fehlerText {
+  color: var(--rot);
+  font-size: 13px;
+  margin-top: 5px;
+}
+.fehlerBox {
+  background: #fdecee;
+  border: 1px solid var(--rot);
+  color: var(--rot);
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  margin: 0 0 14px;
+}
+.hinweis {
+  color: var(--grau);
+  font-size: 14px;
+}
+
+/* --- Buttons --- */
+.primaryBtn {
+  background: var(--rot);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  padding: 11px 18px;
+  font-size: 14.5px;
+  font-weight: 600;
+  font-family: "Inter", sans-serif;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.primaryBtn:hover:not(:disabled) {
+  filter: brightness(0.92);
+}
+.primaryBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.secondaryBtn {
+  background: #fff;
+  color: var(--dunkel);
+  border: 1.5px solid var(--linie);
+  border-radius: 7px;
+  padding: 10px 16px;
+  font-size: 14.5px;
+  font-weight: 500;
+  font-family: "Inter", sans-serif;
+  cursor: pointer;
+}
+.secondaryBtn:hover:not(:disabled) {
+  border-color: var(--grau);
+}
+.secondaryBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.linkBtn {
+  background: none;
+  border: none;
+  color: var(--grau);
+  font-size: 12px;
+  font-family: "Inter", sans-serif;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+.linkBtn:hover {
+  color: var(--dunkel);
+}
+
+.deleteBtn {
+  background: none;
+  border: 1px solid var(--linie);
+  color: var(--grau);
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-size: 12.5px;
+  font-family: "Inter", sans-serif;
+  cursor: pointer;
+}
+.deleteBtn:hover {
+  border-color: var(--rot);
+  color: var(--rot);
+}
+
+.primaryBtn:focus-visible,
+.secondaryBtn:focus-visible,
+.linkBtn:focus-visible,
+.deleteBtn:focus-visible,
+.input:focus-visible {
+  outline: 2px solid var(--dunkel);
+  outline-offset: 2px;
+}
+
+.buttonZeile {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+/* --- Bestätigungs-Popup --- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 26, 30, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 50;
+}
+.dialog {
+  background: #fff;
+  border-radius: 10px;
+  padding: 22px 22px 20px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+}
+.dialog h3 {
+  font-family: "Archivo Black", "Inter", sans-serif;
+  font-size: 17px;
+  margin: 0 0 16px;
+}
+.dialog dl {
+  margin: 0 0 18px;
+  padding: 0;
+}
+.dlRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--linie);
+}
+.dlRow dt {
+  color: var(--grau);
+  font-size: 13.5px;
+}
+.dlRow dd {
+  margin: 0;
+  font-weight: 600;
+  font-size: 14.5px;
+  text-align: right;
+}
+
+/* --- Verwaltung --- */
+.adminKopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.adminAktionen {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+.tabelle th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--grau);
+  padding: 8px 10px;
+  border-bottom: 2px solid var(--dunkel);
+}
+.tabelle td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--linie);
+}
+.tabellenScroll {
+  overflow-x: auto;
+}
+
+.footer {
+  margin-top: 22px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.footerText {
+  font-size: 12px;
+  color: var(--grau);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+
+/* --- Fixe Gegner-Anzeige (Standard gesetzt) --- */
+.gegnerFix {
+  padding: 11px 12px;
+  font-size: 15px;
+  font-weight: 600;
+  border: 1.5px solid var(--linie);
+  border-radius: 7px;
+  background: var(--hintergrund);
+  color: var(--dunkel);
+}
+.gegnerFixZusatz {
+  font-weight: 400;
+  color: var(--grau);
+}
