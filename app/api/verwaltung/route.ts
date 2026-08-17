@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   const [teilnehmerRes, gegnerRes] = await Promise.all([
     supabase
       .from("teilnehmer")
-      .select("id, gegner, name, vorname, geburtsdatum, erfasst_am")
+      .select("id, gegner, name, vorname, ausweisnummer, erfasst_am")
       .order("gegner", { ascending: true })
       .order("name", { ascending: true })
       .order("vorname", { ascending: true }),

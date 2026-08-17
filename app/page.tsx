@@ -3,35 +3,33 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-function formatDatumCH(isoDate: string): string {
-  if (!isoDate) return "";
-  const [y, m, d] = isoDate.split("-");
-  return `${d}.${m}.${y}`;
-}
-
 type Fehler = Partial<
-  Record<"gegner" | "vorname" | "name" | "geburtsdatum", string>
+  Record<"gegner" | "vorname" | "name" | "ausweisnummer", string>
 >;
+
+// Leerzeichen/Bindestriche raus, Grossbuchstaben – z. B. "e 123 4567"
+// wird zu "E1234567". Deckt CH-ID/Pass (8–9-stellig) und ausländische
+// Dokumente (andere Längen) gleichermassen ab.
+function bereinigeAusweisnummer(wert: string): string {
+  return wert.replace(/[\s-]/g, "").toUpperCase();
+}
 
 function validiere(
   gegner: string,
   vorname: string,
   name: string,
-  geburtsdatum: string
+  ausweisnummer: string
 ): Fehler {
   const fehler: Fehler = {};
   if (!gegner.trim()) fehler.gegner = "Bitte gegnerische Mannschaft angeben.";
   if (!vorname.trim()) fehler.vorname = "Bitte Vorname angeben.";
   if (!name.trim()) fehler.name = "Bitte Name angeben.";
-  if (!geburtsdatum) {
-    fehler.geburtsdatum = "Bitte Geburtsdatum angeben.";
-  } else {
-    const d = new Date(geburtsdatum);
-    const heute = new Date();
-    const min = new Date();
-    min.setFullYear(heute.getFullYear() - 120);
-    if (d > heute) fehler.geburtsdatum = "Das Geburtsdatum liegt in der Zukunft.";
-    else if (d < min) fehler.geburtsdatum = "Bitte Geburtsdatum prüfen.";
+  const bereinigt = bereinigeAusweisnummer(ausweisnummer);
+  if (!bereinigt) {
+    fehler.ausweisnummer = "Bitte Ausweisnummer angeben.";
+  } else if (!/^[A-Z0-9]{6,20}$/.test(bereinigt)) {
+    fehler.ausweisnummer =
+      "Ungültige Ausweisnummer (6–20 Zeichen, nur Buchstaben und Ziffern).";
   }
   return fehler;
 }
@@ -42,7 +40,7 @@ export default function Erfassung() {
   const [gegnerGeladen, setGegnerGeladen] = useState(false);
   const [vorname, setVorname] = useState("");
   const [name, setName] = useState("");
-  const [geburtsdatum, setGeburtsdatum] = useState("");
+  const [ausweisnummer, setAusweisnummer] = useState("");
   const [fehler, setFehler] = useState<Fehler>({});
   const [zeigeBestaetigung, setZeigeBestaetigung] = useState(false);
   const [speichert, setSpeichert] = useState(false);
@@ -51,7 +49,7 @@ export default function Erfassung() {
 
   // Standard-Gegner beim Laden holen
   useEffect(() => {
-    fetch("/api/gegner", { cache: "no-store" })
+    fetch("/api/gegner")
       .then((res) => (res.ok ? res.json() : { gegner: "" }))
       .then((data) => {
         if (data.gegner) {
@@ -64,7 +62,7 @@ export default function Erfassung() {
   }, []);
 
   const pruefen = () => {
-    const f = validiere(gegner, vorname, name, geburtsdatum);
+    const f = validiere(gegner, vorname, name, ausweisnummer);
     setFehler(f);
     if (Object.keys(f).length === 0) {
       setSpeicherFehler("");
@@ -83,7 +81,7 @@ export default function Erfassung() {
           gegner: gegner.trim(),
           vorname: vorname.trim(),
           name: name.trim(),
-          geburtsdatum,
+          ausweisnummer: bereinigeAusweisnummer(ausweisnummer),
         }),
       });
       if (!res.ok) {
@@ -95,7 +93,7 @@ export default function Erfassung() {
       // nächste Person am selben Gerät nicht neu eintippen muss.
       setVorname("");
       setName("");
-      setGeburtsdatum("");
+      setAusweisnummer("");
       setFehler({});
       setZeigeBestaetigung(false);
       setZeigeErfolg(true);
@@ -186,17 +184,18 @@ export default function Erfassung() {
         </div>
 
         <div className="feld">
-          <label htmlFor="geburtsdatum">Geburtsdatum</label>
+          <label htmlFor="ausweisnummer">Ausweisnummer (Pass oder ID)</label>
           <input
-            id="geburtsdatum"
+            id="ausweisnummer"
             className="input"
-            type="date"
-            value={geburtsdatum}
-            onChange={(e) => setGeburtsdatum(e.target.value)}
-            max={new Date().toISOString().split("T")[0]}
+            type="text"
+            value={ausweisnummer}
+            onChange={(e) => setAusweisnummer(e.target.value)}
+            placeholder="z. B. E1234567"
+            autoCapitalize="characters"
           />
-          {fehler.geburtsdatum && (
-            <div className="fehlerText">{fehler.geburtsdatum}</div>
+          {fehler.ausweisnummer && (
+            <div className="fehlerText">{fehler.ausweisnummer}</div>
           )}
         </div>
 
@@ -223,8 +222,8 @@ export default function Erfassung() {
                 <dd>{name.trim()}</dd>
               </div>
               <div className="dlRow">
-                <dt>Geburtsdatum</dt>
-                <dd>{formatDatumCH(geburtsdatum)}</dd>
+                <dt>Ausweisnummer</dt>
+                <dd>{bereinigeAusweisnummer(ausweisnummer)}</dd>
               </div>
             </dl>
             {speicherFehler && <div className="fehlerBox">{speicherFehler}</div>}

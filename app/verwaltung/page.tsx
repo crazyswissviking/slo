@@ -8,15 +8,9 @@ type Teilnehmer = {
   gegner: string;
   name: string;
   vorname: string;
-  geburtsdatum: string;
+  ausweisnummer: string;
   erfasst_am: string;
 };
-
-function formatDatumCH(isoDate: string): string {
-  if (!isoDate) return "";
-  const [y, m, d] = isoDate.split("-");
-  return `${d}.${m}.${y}`;
-}
 
 export default function Verwaltung() {
   const [passwort, setPasswort] = useState("");
@@ -115,14 +109,12 @@ export default function Verwaltung() {
       : eintraege.filter((e) => e.gegner === filterGegner);
 
   const csvExport = () => {
-    const kopf = "Spiel;Name;Vorname;Geburtsdatum;Erfasst am";
+    const kopf = "Spiel;Name;Vorname;Ausweisnummer;Erfasst am";
     const zeilen = gefiltert.map((e) => {
       const erfasst = e.erfasst_am
         ? new Date(e.erfasst_am).toLocaleString("de-CH")
         : "";
-      return `${e.gegner} – FC Thun;${e.name};${e.vorname};${formatDatumCH(
-        e.geburtsdatum
-      )};${erfasst}`;
+      return `${e.gegner} – FC Thun;${e.name};${e.vorname};${e.ausweisnummer};${erfasst}`;
     });
     const csv = "\uFEFF" + [kopf, ...zeilen].join("\r\n"); // BOM für Excel
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -283,7 +275,7 @@ export default function Verwaltung() {
                       <th>Spiel</th>
                       <th>Name</th>
                       <th>Vorname</th>
-                      <th>Geburtsdatum</th>
+                      <th>Ausweisnummer</th>
                       <th>Erfasst am</th>
                       <th></th>
                     </tr>
@@ -294,7 +286,7 @@ export default function Verwaltung() {
                         <td style={{ whiteSpace: "nowrap" }}>{e.gegner}</td>
                         <td>{e.name}</td>
                         <td>{e.vorname}</td>
-                        <td>{formatDatumCH(e.geburtsdatum)}</td>
+                        <td>{e.ausweisnummer}</td>
                         <td style={{ whiteSpace: "nowrap" }}>
                           {e.erfasst_am
                             ? new Date(e.erfasst_am).toLocaleString("de-CH", {

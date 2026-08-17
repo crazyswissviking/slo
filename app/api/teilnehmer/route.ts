@@ -7,27 +7,27 @@ type Eingabe = {
   gegner?: string;
   vorname?: string;
   name?: string;
-  geburtsdatum?: string;
+  ausweisnummer?: string;
 };
+
+// Leerzeichen/Bindestriche raus, Grossbuchstaben. Deckt Schweizer
+// ID/Pass (8–9-stellig) und ausländische Dokumente (andere Längen)
+// gleichermassen ab.
+function bereinigeAusweisnummer(wert: string): string {
+  return wert.replace(/[\s-]/g, "").toUpperCase();
+}
 
 function validiere(e: Eingabe): string | null {
   const gegner = (e.gegner ?? "").trim();
   const vorname = (e.vorname ?? "").trim();
   const name = (e.name ?? "").trim();
-  const geburtsdatum = e.geburtsdatum ?? "";
+  const ausweisnummer = bereinigeAusweisnummer(e.ausweisnummer ?? "");
 
   if (!gegner) return "Gegnerische Mannschaft fehlt.";
   if (!vorname) return "Vorname fehlt.";
   if (!name) return "Name fehlt.";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(geburtsdatum))
-    return "Geburtsdatum ist ungültig.";
-
-  const d = new Date(geburtsdatum);
-  const heute = new Date();
-  const min = new Date();
-  min.setFullYear(heute.getFullYear() - 120);
-  if (isNaN(d.getTime()) || d > heute || d < min)
-    return "Geburtsdatum ist unplausibel.";
+  if (!/^[A-Z0-9]{6,20}$/.test(ausweisnummer))
+    return "Ausweisnummer ist ungültig (6–20 Zeichen, nur Buchstaben und Ziffern).";
 
   if (gegner.length > 100 || vorname.length > 100 || name.length > 100)
     return "Eingabe zu lang.";
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     gegner: body.gegner!.trim(),
     vorname: body.vorname!.trim(),
     name: body.name!.trim(),
-    geburtsdatum: body.geburtsdatum,
+    ausweisnummer: bereinigeAusweisnummer(body.ausweisnummer!),
   });
 
   if (error) {
