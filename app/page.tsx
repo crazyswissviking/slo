@@ -51,7 +51,7 @@ export default function Erfassung() {
 
   // Standard-Gegner beim Laden holen
   useEffect(() => {
-    fetch("/api/gegner")
+    fetch("/api/gegner", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : { gegner: "" }))
       .then((data) => {
         if (data.gegner) {
