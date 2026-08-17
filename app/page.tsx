@@ -8,10 +8,27 @@ type Fehler = Partial<
 >;
 
 // Leerzeichen/Bindestriche raus, Grossbuchstaben – z. B. "e 123 4567"
-// wird zu "E1234567". Deckt CH-ID/Pass (8–9-stellig) und ausländische
-// Dokumente (andere Längen) gleichermassen ab.
+// wird zu "E1234567".
 function bereinigeAusweisnummer(wert: string): string {
   return wert.replace(/[\s-]/g, "").toUpperCase();
+}
+
+// Schweizer Formate: alt = 1 Buchstabe + 7 Ziffern (8-stellig),
+// neu (ab 2023) = 9-stellig alphanumerisch. Die Buchstaben O und I
+// werden laut Fedpol auf Schweizer Ausweisen nie verwendet (Verwechslung
+// mit 0/1). Andere Längen (6–20 Zeichen) werden als ausländisches
+// Dokument akzeptiert, ohne die O/I-Einschränkung.
+function ausweisnummerFehler(bereinigt: string): string | null {
+  if (!bereinigt) return "Bitte Ausweisnummer angeben.";
+  if (!/^[A-Z0-9]{6,20}$/.test(bereinigt)) {
+    return "Ungültige Ausweisnummer (6–20 Zeichen, nur Buchstaben und Ziffern).";
+  }
+  const istAltesChFormat = /^[A-Z][0-9]{7}$/.test(bereinigt);
+  const istNeuesChFormat = bereinigt.length === 9;
+  if ((istAltesChFormat || istNeuesChFormat) && /[OI]/.test(bereinigt)) {
+    return "Die Buchstaben O und I werden bei Schweizer Pässen/IDs nicht verwendet – vermutlich ist 0 oder 1 gemeint.";
+  }
+  return null;
 }
 
 function validiere(
@@ -24,13 +41,8 @@ function validiere(
   if (!gegner.trim()) fehler.gegner = "Bitte gegnerische Mannschaft angeben.";
   if (!vorname.trim()) fehler.vorname = "Bitte Vorname angeben.";
   if (!name.trim()) fehler.name = "Bitte Name angeben.";
-  const bereinigt = bereinigeAusweisnummer(ausweisnummer);
-  if (!bereinigt) {
-    fehler.ausweisnummer = "Bitte Ausweisnummer angeben.";
-  } else if (!/^[A-Z0-9]{6,20}$/.test(bereinigt)) {
-    fehler.ausweisnummer =
-      "Ungültige Ausweisnummer (6–20 Zeichen, nur Buchstaben und Ziffern).";
-  }
+  const ausweisFehler = ausweisnummerFehler(bereinigeAusweisnummer(ausweisnummer));
+  if (ausweisFehler) fehler.ausweisnummer = ausweisFehler;
   return fehler;
 }
 
