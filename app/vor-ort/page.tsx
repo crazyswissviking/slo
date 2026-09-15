@@ -28,7 +28,6 @@ function formatDatum(iso: string): string {
     weekday: "short",
     day: "2-digit",
     month: "2-digit",
-    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -47,21 +46,37 @@ export default function VorOrt() {
   const [loginFehler, setLoginFehler] = useState("");
 
   const [spiele, setSpiele] = useState<Spiel[]>([]);
+  const [ausgewaehltesSpiel, setAusgewaehltesSpiel] = useState<string | null>(null);
+
   const [suchbegriff, setSuchbegriff] = useState("");
   const [treffer, setTreffer] = useState<PersonTreffer[]>([]);
   const [sucht, setSucht] = useState(false);
   const [ausgewaehlt, setAusgewaehlt] = useState<PersonTreffer | null>(null);
-  const [anzahlEingabe, setAnzahlEingabe] = useState<Record<string, string>>({});
-  const [speichertSpiel, setSpeichertSpiel] = useState<Record<string, boolean>>({});
+  const [anzahlEingabe, setAnzahlEingabe] = useState("");
+  const [speichert, setSpeichert] = useState(false);
   const [fehler, setFehler] = useState("");
 
   useEffect(() => {
     if (!passwort) return;
     fetch("/api/spiele")
       .then((res) => res.json())
-      .then((data) => setSpiele(data.spiele ?? []))
+      .then((data) => {
+        const geladen: Spiel[] = data.spiele ?? [];
+        setSpiele(geladen);
+        if (geladen.length > 0) setAusgewaehltesSpiel((alt) => alt ?? geladen[0].id);
+      })
       .catch(() => setFehler("Spieldaten konnten nicht geladen werden."));
   }, [passwort]);
+
+  // Anzahl-Eingabefeld synchron zum gewählten Spiel/gewählter Person halten.
+  useEffect(() => {
+    if (!ausgewaehlt || !ausgewaehltesSpiel) {
+      setAnzahlEingabe("");
+      return;
+    }
+    const t = ausgewaehlt.tickets.find((t) => t.spiel_id === ausgewaehltesSpiel);
+    setAnzahlEingabe(t ? String(t.anzahl) : "");
+  }, [ausgewaehlt, ausgewaehltesSpiel]);
 
   const anmelden = () => {
     setLoginFehler("");
@@ -95,24 +110,19 @@ export default function VorOrt() {
     }
   }, [suchbegriff, passwort]);
 
-  const personAuswaehlen = (p: PersonTreffer) => {
-    setAusgewaehlt(p);
-    const eingabe: Record<string, string> = {};
-    for (const s of spiele) {
-      const t = p.tickets.find((t) => t.spiel_id === s.id);
-      eingabe[s.id] = t ? String(t.anzahl) : "";
-    }
-    setAnzahlEingabe(eingabe);
-  };
+  const aktuellesSpiel = spiele.find((s) => s.id === ausgewaehltesSpiel) ?? null;
+  const aktuellesTicket = ausgewaehlt?.tickets.find(
+    (t) => t.spiel_id === ausgewaehltesSpiel
+  );
 
-  const ticketSpeichern = async (spielId: string) => {
-    if (!ausgewaehlt) return;
-    const anzahl = Number(anzahlEingabe[spielId] || 0);
+  const ticketSpeichern = async () => {
+    if (!ausgewaehlt || !ausgewaehltesSpiel) return;
+    const anzahl = Number(anzahlEingabe || 0);
     if (!Number.isInteger(anzahl) || anzahl < 0) {
       setFehler("Bitte eine gültige Anzahl Tickets eingeben.");
       return;
     }
-    setSpeichertSpiel((alt) => ({ ...alt, [spielId]: true }));
+    setSpeichert(true);
     setFehler("");
     try {
       const res = await fetch("/api/vor-ort", {
@@ -123,7 +133,7 @@ export default function VorOrt() {
         },
         body: JSON.stringify({
           person_id: ausgewaehlt.id,
-          spiel_id: spielId,
+          spiel_id: ausgewaehltesSpiel,
           anzahl,
         }),
       });
@@ -131,13 +141,13 @@ export default function VorOrt() {
       if (!res.ok) throw new Error(data?.error ?? "Speichern fehlgeschlagen.");
       setAusgewaehlt((alt) => {
         if (!alt) return alt;
-        const restlicheTickets = alt.tickets.filter((t) => t.spiel_id !== spielId);
-        return { ...alt, tickets: [...restlicheTickets, data.ticket] };
+        const restliche = alt.tickets.filter((t) => t.spiel_id !== ausgewaehltesSpiel);
+        return { ...alt, tickets: [...restliche, data.ticket] };
       });
     } catch (e) {
       setFehler(e instanceof Error ? e.message : "Speichern fehlgeschlagen.");
     } finally {
-      setSpeichertSpiel((alt) => ({ ...alt, [spielId]: false }));
+      setSpeichert(false);
     }
   };
 
@@ -166,9 +176,10 @@ export default function VorOrt() {
     }
   };
 
-  const gesamtbetrag = ausgewaehlt
-    ? ausgewaehlt.tickets.reduce((summe, t) => summe + t.betrag, 0)
-    : 0;
+  const andereTickets =
+    ausgewaehlt?.tickets.filter(
+      (t) => t.spiel_id !== ausgewaehltesSpiel && t.anzahl > 0
+    ) ?? [];
 
   return (
     <div className="page">
@@ -215,187 +226,199 @@ export default function VorOrt() {
       ) : (
         <>
           <div className="card" style={{ marginBottom: 20 }}>
-            <h2>Person suchen</h2>
-            <p className="hinweis" style={{ marginTop: -8, marginBottom: 16 }}>
-              Suche nach Code, Name, Vorname oder E-Mail.
+            <h2>Neue Tickets</h2>
+            <p className="hinweis" style={{ marginTop: -8, marginBottom: 12 }}>
+              Spiel wählen, für das jetzt Tickets verkauft werden.
             </p>
-            <div className="feld">
-              <label htmlFor="suche">Suche</label>
-              <input
-                id="suche"
-                className="input"
-                type="text"
-                value={suchbegriff}
-                onChange={(e) => setSuchbegriff(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && suchen()}
-                placeholder="z. B. K7H2PQ oder Berger"
-              />
+            <div className="buttonZeile" style={{ justifyContent: "flex-start" }}>
+              {spiele.map((s) => (
+                <button
+                  key={s.id}
+                  className={
+                    ausgewaehltesSpiel === s.id ? "primaryBtn" : "secondaryBtn"
+                  }
+                  onClick={() => setAusgewaehltesSpiel(s.id)}
+                  style={{ textAlign: "left" }}
+                >
+                  {s.gegner}
+                  <br />
+                  <span style={{ fontWeight: 400, fontSize: 12, opacity: 0.85 }}>
+                    {formatDatum(s.datum)}
+                  </span>
+                </button>
+              ))}
             </div>
-            <div className="buttonZeile">
-              <button className="primaryBtn" onClick={suchen} disabled={sucht}>
-                {sucht ? "Sucht …" : "Suchen"}
-              </button>
-            </div>
-
-            {fehler && <div className="fehlerBox">{fehler}</div>}
-
-            {treffer.length > 0 && (
-              <div style={{ marginTop: 16 }}>
-                {treffer.map((p) => (
-                  <button
-                    key={p.id}
-                    className="secondaryBtn"
-                    style={{
-                      display: "block",
-                      width: "100%",
-                      textAlign: "left",
-                      marginBottom: 8,
-                      borderColor:
-                        ausgewaehlt?.id === p.id ? "var(--rot)" : undefined,
-                    }}
-                    onClick={() => personAuswaehlen(p)}
-                  >
-                    <strong>
-                      {p.vorname} {p.name}
-                    </strong>{" "}
-                    · Code {p.code} · {p.email}
-                    {!p.daten_erfasst && (
-                      <span style={{ color: "var(--rot)" }}>
-                        {" "}
-                        · Angaben noch nicht erfasst
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
 
-          {ausgewaehlt && (
+          {ausgewaehltesSpiel && (
+            <div className="card" style={{ marginBottom: 20 }}>
+              <h2>Kunde suchen</h2>
+              <p className="hinweis" style={{ marginTop: -8, marginBottom: 16 }}>
+                Suche nach Code, Name, Vorname oder E-Mail.
+              </p>
+              <div className="feld">
+                <label htmlFor="suche">Suche</label>
+                <input
+                  id="suche"
+                  className="input"
+                  type="text"
+                  value={suchbegriff}
+                  onChange={(e) => setSuchbegriff(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && suchen()}
+                  placeholder="z. B. K7H2PQ oder Berger"
+                />
+              </div>
+              <div className="buttonZeile">
+                <button className="primaryBtn" onClick={suchen} disabled={sucht}>
+                  {sucht ? "Sucht …" : "Suchen"}
+                </button>
+              </div>
+
+              {fehler && <div className="fehlerBox">{fehler}</div>}
+
+              {treffer.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  {treffer.map((p) => (
+                    <button
+                      key={p.id}
+                      className="secondaryBtn"
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        textAlign: "left",
+                        marginBottom: 8,
+                        borderColor:
+                          ausgewaehlt?.id === p.id ? "var(--rot)" : undefined,
+                      }}
+                      onClick={() => setAusgewaehlt(p)}
+                    >
+                      <strong>
+                        {p.vorname} {p.name}
+                      </strong>{" "}
+                      · Code {p.code} · {p.email}
+                      {!p.daten_erfasst && (
+                        <span style={{ color: "var(--rot)" }}>
+                          {" "}
+                          · Angaben noch nicht erfasst
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {ausgewaehlt && aktuellesSpiel && (
             <div className="card">
               <h2>
                 {ausgewaehlt.vorname} {ausgewaehlt.name}{" "}
                 <span className="anzahl">(Code {ausgewaehlt.code})</span>
               </h2>
+              <p className="hinweis" style={{ marginTop: -8, marginBottom: 16 }}>
+                {ausgewaehlt.email}
+              </p>
 
-              {spiele.map((s) => {
-                const ticket = ausgewaehlt.tickets.find((t) => t.spiel_id === s.id);
-                return (
+              <div style={{ fontWeight: 600, marginBottom: 2 }}>
+                {aktuellesSpiel.gegner} – {aktuellesSpiel.heimteam}
+              </div>
+              <div className="hinweis" style={{ marginBottom: 14 }}>
+                {formatDatum(aktuellesSpiel.datum)}
+                {aktuellesSpiel.preis_pro_ticket !== null && (
+                  <> · CHF {formatChf(aktuellesSpiel.preis_pro_ticket)} pro Ticket</>
+                )}
+              </div>
+
+              {aktuellesSpiel.preis_pro_ticket === null ? (
+                <div className="fehlerText">
+                  Kein Ticketpreis hinterlegt – bitte zuerst in der Verwaltung
+                  setzen.
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+                    <div className="feld" style={{ marginBottom: 0, flex: "0 0 120px" }}>
+                      <label htmlFor="anzahl">Anzahl Tickets</label>
+                      <input
+                        id="anzahl"
+                        className="input"
+                        type="number"
+                        min={0}
+                        max={50}
+                        value={anzahlEingabe}
+                        onChange={(e) => setAnzahlEingabe(e.target.value)}
+                      />
+                    </div>
+                    <button
+                      className="secondaryBtn"
+                      onClick={ticketSpeichern}
+                      disabled={speichert}
+                    >
+                      {speichert ? "Speichert …" : "Speichern"}
+                    </button>
+                  </div>
+
                   <div
-                    key={s.id}
                     style={{
-                      borderTop: "1px solid var(--linie)",
+                      borderTop: "2px solid var(--dunkel)",
+                      marginTop: 16,
                       paddingTop: 14,
-                      marginTop: 14,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                      gap: 10,
                     }}
                   >
-                    <div style={{ fontWeight: 600, marginBottom: 2 }}>
-                      {s.gegner} – {s.heimteam}
-                    </div>
-                    <div className="hinweis" style={{ marginBottom: 10 }}>
-                      {formatDatum(s.datum)}
-                      {s.preis_pro_ticket !== null && (
-                        <> · CHF {formatChf(s.preis_pro_ticket)} pro Ticket</>
-                      )}
-                    </div>
-
-                    {s.preis_pro_ticket === null ? (
-                      <div className="fehlerText">
-                        Kein Ticketpreis hinterlegt – bitte zuerst in der
-                        Verwaltung setzen.
+                    <div>
+                      <div style={{ fontSize: 13, color: "var(--grau)" }}>
+                        Gesamtbetrag – zu bezahlen via TWINT
                       </div>
-                    ) : (
-                      <>
-                        <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
-                          <div className="feld" style={{ marginBottom: 0, flex: "0 0 120px" }}>
-                            <label htmlFor={`anzahl-${s.id}`}>Anzahl Tickets</label>
-                            <input
-                              id={`anzahl-${s.id}`}
-                              className="input"
-                              type="number"
-                              min={0}
-                              max={50}
-                              value={anzahlEingabe[s.id] ?? ""}
-                              onChange={(e) =>
-                                setAnzahlEingabe((alt) => ({
-                                  ...alt,
-                                  [s.id]: e.target.value,
-                                }))
-                              }
-                            />
-                          </div>
-                          <button
-                            className="secondaryBtn"
-                            onClick={() => ticketSpeichern(s.id)}
-                            disabled={speichertSpiel[s.id]}
-                          >
-                            {speichertSpiel[s.id] ? "Speichert …" : "Speichern"}
-                          </button>
-                        </div>
-
-                        {ticket && (
-                          <div
-                            style={{
-                              marginTop: 12,
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              flexWrap: "wrap",
-                              gap: 10,
-                            }}
-                          >
-                            <div>
-                              <div style={{ fontSize: 13, color: "var(--grau)" }}>
-                                Zu bezahlen via TWINT
-                              </div>
-                              <div style={{ fontSize: 22, fontWeight: 700 }}>
-                                CHF {formatChf(ticket.betrag)}
-                              </div>
-                            </div>
-                            {ticket.bezahlt ? (
-                              <button
-                                className="secondaryBtn"
-                                onClick={() => bezahltMarkieren(ticket.id, false)}
-                              >
-                                Bezahlt am{" "}
-                                {ticket.bezahlt_am
-                                  ? new Date(ticket.bezahlt_am).toLocaleString(
-                                      "de-CH",
-                                      { dateStyle: "short", timeStyle: "short" }
-                                    )
-                                  : ""}{" "}
-                                · rückgängig
-                              </button>
-                            ) : (
-                              <button
-                                className="primaryBtn"
-                                onClick={() => bezahltMarkieren(ticket.id, true)}
-                              >
-                                Als bezahlt markieren
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </>
+                      <div style={{ fontSize: 26, fontWeight: 700 }}>
+                        CHF {formatChf(aktuellesTicket?.betrag ?? 0)}
+                      </div>
+                    </div>
+                    {aktuellesTicket && aktuellesTicket.anzahl > 0 && (
+                      aktuellesTicket.bezahlt ? (
+                        <button
+                          className="secondaryBtn"
+                          onClick={() => bezahltMarkieren(aktuellesTicket.id, false)}
+                        >
+                          Bezahlt am{" "}
+                          {aktuellesTicket.bezahlt_am
+                            ? new Date(aktuellesTicket.bezahlt_am).toLocaleString(
+                                "de-CH",
+                                { dateStyle: "short", timeStyle: "short" }
+                              )
+                            : ""}{" "}
+                          · rückgängig
+                        </button>
+                      ) : (
+                        <button
+                          className="primaryBtn"
+                          onClick={() => bezahltMarkieren(aktuellesTicket.id, true)}
+                        >
+                          Als bezahlt markieren
+                        </button>
+                      )
                     )}
                   </div>
-                );
-              })}
+                </>
+              )}
 
-              <div
-                style={{
-                  borderTop: "2px solid var(--dunkel)",
-                  marginTop: 16,
-                  paddingTop: 14,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  fontWeight: 700,
-                  fontSize: 16,
-                }}
-              >
-                <span>Total</span>
-                <span>CHF {formatChf(gesamtbetrag)}</span>
-              </div>
+              {andereTickets.length > 0 && (
+                <p className="hinweis" style={{ marginTop: 16 }}>
+                  Weitere Spiele:{" "}
+                  {andereTickets
+                    .map((t) => {
+                      const s = spiele.find((s) => s.id === t.spiel_id);
+                      return `${s?.gegner ?? t.spiel_id}: ${t.anzahl} × (${
+                        t.bezahlt ? "bezahlt" : "offen"
+                      })`;
+                    })
+                    .join(" · ")}
+                </p>
+              )}
             </div>
           )}
 
