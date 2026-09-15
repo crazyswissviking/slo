@@ -15,71 +15,23 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Nicht berechtigt." }, { status: 401 });
   }
 
-  const supabase = supabaseAdmin();
+  const { data, error } = await supabaseAdmin()
+    .from("personen")
+    .select(
+      "id, code, email, name, vorname, adresse, plz, ort, tel, daten_erfasst, angefordert_am, erfasst_am, tickets(id, spiel_id, anzahl, betrag, bezahlt, bezahlt_am)"
+    )
+    .order("erfasst_am", { ascending: false, nullsFirst: false })
+    .order("angefordert_am", { ascending: false });
 
-  const [teilnehmerRes, gegnerRes] = await Promise.all([
-    supabase
-      .from("teilnehmer")
-      .select("id, gegner, name, vorname, ausweisnummer, erfasst_am")
-      .order("gegner", { ascending: true })
-      .order("name", { ascending: true })
-      .order("vorname", { ascending: true }),
-    supabase
-      .from("einstellungen")
-      .select("wert")
-      .eq("schluessel", "aktueller_gegner")
-      .maybeSingle(),
-  ]);
-
-  if (teilnehmerRes.error) {
-    console.error("Select-Fehler:", teilnehmerRes.error);
+  if (error) {
+    console.error("Select-Fehler:", error);
     return NextResponse.json(
       { error: "Liste konnte nicht geladen werden." },
       { status: 500 }
     );
   }
 
-  return NextResponse.json({
-    teilnehmer: teilnehmerRes.data ?? [],
-    standardGegner: gegnerRes.data?.wert ?? "",
-  });
-}
-
-// Standard-Gegner setzen oder löschen (leerer String = kein Standard)
-export async function PUT(req: NextRequest) {
-  if (!istBerechtigt(req)) {
-    return NextResponse.json({ error: "Nicht berechtigt." }, { status: 401 });
-  }
-
-  let body: { gegner?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 400 });
-  }
-
-  const gegner = (body.gegner ?? "").trim();
-  if (gegner.length > 100) {
-    return NextResponse.json({ error: "Eingabe zu lang." }, { status: 400 });
-  }
-
-  const { error } = await supabaseAdmin()
-    .from("einstellungen")
-    .upsert({
-      schluessel: "aktueller_gegner",
-      wert: gegner,
-      geaendert_am: new Date().toISOString(),
-    });
-
-  if (error) {
-    console.error("Einstellungs-Fehler:", error);
-    return NextResponse.json(
-      { error: "Speichern fehlgeschlagen." },
-      { status: 500 }
-    );
-  }
-
-  return NextResponse.json({ ok: true, standardGegner: gegner });
+  return NextResponse.json({ personen: data ?? [] });
 }
 
 export async function DELETE(req: NextRequest) {
@@ -92,10 +44,8 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "ID fehlt." }, { status: 400 });
   }
 
-  const { error } = await supabaseAdmin()
-    .from("teilnehmer")
-    .delete()
-    .eq("id", id);
+  // Tickets werden per "on delete cascade" automatisch mitgelöscht.
+  const { error } = await supabaseAdmin().from("personen").delete().eq("id", id);
 
   if (error) {
     console.error("Delete-Fehler:", error);

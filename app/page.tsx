@@ -1,123 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 
-type Fehler = Partial<
-  Record<"gegner" | "vorname" | "name" | "ausweisnummer", string>
->;
+export default function Start() {
+  const [email, setEmail] = useState("");
+  const [sendet, setSendet] = useState(false);
+  const [fehler, setFehler] = useState("");
+  const [gesendet, setGesendet] = useState(false);
 
-// Leerzeichen/Bindestriche raus, Grossbuchstaben – z. B. "e 123 4567"
-// wird zu "E1234567".
-function bereinigeAusweisnummer(wert: string): string {
-  return wert.replace(/[\s-]/g, "").toUpperCase();
-}
-
-// Schweizer Formate: alt = 1 Buchstabe + 7 Ziffern (8-stellig),
-// neu (ab 2023) = 9-stellig alphanumerisch. Die Buchstaben O und I
-// werden laut Fedpol auf Schweizer Ausweisen nie verwendet (Verwechslung
-// mit 0/1). Andere Längen (6–20 Zeichen) werden als ausländisches
-// Dokument akzeptiert, ohne die O/I-Einschränkung.
-function ausweisnummerFehler(bereinigt: string): string | null {
-  if (!bereinigt) return "Bitte Ausweisnummer angeben.";
-  if (!/^[A-Z0-9]{6,20}$/.test(bereinigt)) {
-    return "Ungültige Ausweisnummer (6–20 Zeichen, nur Buchstaben und Ziffern).";
-  }
-  const istAltesChFormat = /^[A-Z][0-9]{7}$/.test(bereinigt);
-  const istNeuesChFormat = bereinigt.length === 9;
-  if ((istAltesChFormat || istNeuesChFormat) && /[OI]/.test(bereinigt)) {
-    return "Die Buchstaben O und I werden bei Schweizer Pässen/IDs nicht verwendet – vermutlich ist 0 oder 1 gemeint.";
-  }
-  return null;
-}
-
-function validiere(
-  gegner: string,
-  vorname: string,
-  name: string,
-  ausweisnummer: string
-): Fehler {
-  const fehler: Fehler = {};
-  if (!gegner.trim()) fehler.gegner = "Bitte gegnerische Mannschaft angeben.";
-  if (!vorname.trim()) fehler.vorname = "Bitte Vorname angeben.";
-  if (!name.trim()) fehler.name = "Bitte Name angeben.";
-  const ausweisFehler = ausweisnummerFehler(bereinigeAusweisnummer(ausweisnummer));
-  if (ausweisFehler) fehler.ausweisnummer = ausweisFehler;
-  return fehler;
-}
-
-export default function Erfassung() {
-  const [gegner, setGegner] = useState("");
-  const [standardGesetzt, setStandardGesetzt] = useState(false);
-  const [gegnerGeladen, setGegnerGeladen] = useState(false);
-  const [vorname, setVorname] = useState("");
-  const [name, setName] = useState("");
-  const [ausweisnummer, setAusweisnummer] = useState("");
-  const [fehler, setFehler] = useState<Fehler>({});
-  const [zeigeBestaetigung, setZeigeBestaetigung] = useState(false);
-  const [speichert, setSpeichert] = useState(false);
-  const [speicherFehler, setSpeicherFehler] = useState("");
-  const [zeigeErfolg, setZeigeErfolg] = useState(false);
-
-  // Standard-Gegner beim Laden holen
-  useEffect(() => {
-    fetch("/api/gegner")
-      .then((res) => (res.ok ? res.json() : { gegner: "" }))
-      .then((data) => {
-        if (data.gegner) {
-          setGegner(data.gegner);
-          setStandardGesetzt(true);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setGegnerGeladen(true));
-  }, []);
-
-  const pruefen = () => {
-    const f = validiere(gegner, vorname, name, ausweisnummer);
-    setFehler(f);
-    if (Object.keys(f).length === 0) {
-      setSpeicherFehler("");
-      setZeigeBestaetigung(true);
+  const linkAnfordern = async () => {
+    setFehler("");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setFehler("Bitte eine gültige E-Mail-Adresse angeben.");
+      return;
     }
-  };
-
-  const speichern = async () => {
-    setSpeichert(true);
-    setSpeicherFehler("");
+    setSendet(true);
     try {
-      const res = await fetch("/api/teilnehmer", {
+      const res = await fetch("/api/registrierung", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          gegner: gegner.trim(),
-          vorname: vorname.trim(),
-          name: name.trim(),
-          ausweisnummer: bereinigeAusweisnummer(ausweisnummer),
-        }),
+        body: JSON.stringify({ email: email.trim() }),
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error ?? "Speichern fehlgeschlagen.");
-      }
-      // Keine weitere Bestätigung – Formular zurücksetzen.
-      // Der Gegner bleibt stehen (Standard oder manuell), damit die
-      // nächste Person am selben Gerät nicht neu eintippen muss.
-      setVorname("");
-      setName("");
-      setAusweisnummer("");
-      setFehler({});
-      setZeigeBestaetigung(false);
-      setZeigeErfolg(true);
-      setTimeout(() => setZeigeErfolg(false), 3000);
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Senden fehlgeschlagen.");
+      setGesendet(true);
     } catch (e) {
-      setSpeicherFehler(
-        e instanceof Error
-          ? e.message
-          : "Die Daten konnten nicht gespeichert werden. Bitte erneut versuchen."
-      );
+      setFehler(e instanceof Error ? e.message : "Senden fehlgeschlagen.");
     } finally {
-      setSpeichert(false);
+      setSendet(false);
     }
   };
 
@@ -126,10 +37,8 @@ export default function Erfassung() {
       <div className="ticket">
         <div className="ticketTop">
           <div>
-            <div className="eyebrow">UEFA · Auswärtsfahrt</div>
-            <h1>
-              {gegner.trim() ? `${gegner.trim().toUpperCase()} – ` : ""}FC THUN
-            </h1>
+            <div className="eyebrow">UEFA · Auswärtsfahrten</div>
+            <h1>FC THUN</h1>
           </div>
           <div className="ticketStub">
             <span className="stubLabel">Sektor</span>
@@ -138,147 +47,69 @@ export default function Erfassung() {
         </div>
         <div className="perforation" />
         <p className="ticketSub">
-          Anmeldung für die Teilnehmerliste. Nur wer erfasst ist, kann ein
-          Ticket lösen.
+          Registrierung für die UEFA-Auswärtsfahrten. Nur wer erfasst ist,
+          kann vor Ort Tickets lösen.
         </p>
       </div>
 
-      <div className="card">
-        <h2>Teilnehmer erfassen</h2>
-
-        <div className="feld">
-          <label htmlFor="gegner">Gegnerische Mannschaft</label>
-          {!gegnerGeladen ? (
-            <div className="gegnerFix">Wird geladen …</div>
-          ) : standardGesetzt ? (
-            <div className="gegnerFix">
-              {gegner} <span className="gegnerFixZusatz">– FC Thun</span>
+      <div className="card" style={{ marginBottom: 20 }}>
+        <h2>Zuhause registrieren</h2>
+        {gesendet ? (
+          <p className="hinweis">
+            Der Link zur Erfassung wurde an <strong>{email.trim()}</strong>{" "}
+            verschickt. Bitte öffne ihn dort und trage deine Angaben ein.
+          </p>
+        ) : (
+          <>
+            <p className="hinweis" style={{ marginTop: -8, marginBottom: 16 }}>
+              Trag deine E-Mail-Adresse ein – wir schicken dir einen Link, mit
+              dem du deine Angaben bequem von zuhause aus erfassen kannst.
+              Vor Ort bestimmst du dann nur noch die Anzahl Tickets pro Spiel.
+            </p>
+            <div className="feld">
+              <label htmlFor="email">E-Mail</label>
+              <input
+                id="email"
+                className="input"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && linkAnfordern()}
+                placeholder="name@beispiel.ch"
+                autoComplete="email"
+              />
+              {fehler && <div className="fehlerText">{fehler}</div>}
             </div>
-          ) : (
-            <input
-              id="gegner"
-              className="input"
-              type="text"
-              value={gegner}
-              onChange={(e) => setGegner(e.target.value)}
-              placeholder="z. B. Sparta Prag"
-            />
-          )}
-          {fehler.gegner && <div className="fehlerText">{fehler.gegner}</div>}
-        </div>
-
-        <div className="feld">
-          <label htmlFor="vorname">Vorname</label>
-          <input
-            id="vorname"
-            className="input"
-            type="text"
-            value={vorname}
-            onChange={(e) => setVorname(e.target.value)}
-            placeholder="z. B. Ueli"
-            autoComplete="given-name"
-          />
-          {fehler.vorname && <div className="fehlerText">{fehler.vorname}</div>}
-        </div>
-
-        <div className="feld">
-          <label htmlFor="name">Name</label>
-          <input
-            id="name"
-            className="input"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="z. B. Berger"
-            autoComplete="family-name"
-          />
-          {fehler.name && <div className="fehlerText">{fehler.name}</div>}
-        </div>
-
-        <div className="feld">
-          <label htmlFor="ausweisnummer">Ausweisnummer (Pass oder ID)</label>
-          <input
-            id="ausweisnummer"
-            className="input"
-            type="text"
-            value={ausweisnummer}
-            onChange={(e) => setAusweisnummer(e.target.value)}
-            placeholder="z. B. E1234567"
-            autoCapitalize="characters"
-          />
-          {fehler.ausweisnummer && (
-            <div className="fehlerText">{fehler.ausweisnummer}</div>
-          )}
-        </div>
-
-        <button className="primaryBtn" onClick={pruefen}>
-          Daten prüfen
-        </button>
-      </div>
-
-      {zeigeBestaetigung && (
-        <div className="overlay" role="dialog" aria-modal="true">
-          <div className="dialog">
-            <h3>Sind diese Angaben korrekt?</h3>
-            <dl>
-              <div className="dlRow">
-                <dt>Spiel</dt>
-                <dd>{gegner.trim()} – FC Thun</dd>
-              </div>
-              <div className="dlRow">
-                <dt>Vorname</dt>
-                <dd>{vorname.trim()}</dd>
-              </div>
-              <div className="dlRow">
-                <dt>Name</dt>
-                <dd>{name.trim()}</dd>
-              </div>
-              <div className="dlRow">
-                <dt>Ausweisnummer</dt>
-                <dd>{bereinigeAusweisnummer(ausweisnummer)}</dd>
-              </div>
-            </dl>
-            {speicherFehler && <div className="fehlerBox">{speicherFehler}</div>}
             <div className="buttonZeile">
               <button
-                className="secondaryBtn"
-                onClick={() => setZeigeBestaetigung(false)}
-                disabled={speichert}
-              >
-                Nein, korrigieren
-              </button>
-              <button
                 className="primaryBtn"
-                onClick={speichern}
-                disabled={speichert}
+                onClick={linkAnfordern}
+                disabled={sendet}
               >
-                {speichert ? "Wird gespeichert …" : "Ja, Daten speichern"}
+                {sendet ? "Wird gesendet …" : "Link zusenden"}
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </div>
 
-      {zeigeErfolg && (
-        <div className="erfolgOverlay" role="status" aria-live="polite">
-          <div className="erfolgKreis">
-            <svg
-              className="erfolgHaken"
-              viewBox="0 0 52 52"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <circle className="erfolgKreisLinie" cx="26" cy="26" r="24" />
-              <path className="erfolgHakenLinie" d="M14 27l8 8 16-16" />
-            </svg>
-          </div>
+      <div className="card">
+        <h2>Für den SLO</h2>
+        <p className="hinweis" style={{ marginTop: -8, marginBottom: 16 }}>
+          Ticketausgabe und Verwaltung sind passwortgeschützt.
+        </p>
+        <div className="buttonZeile" style={{ justifyContent: "flex-start" }}>
+          <Link className="secondaryBtn" href="/vor-ort">
+            Vor-Ort-Erfassung
+          </Link>
+          <Link className="secondaryBtn" href="/verwaltung">
+            Verwaltung
+          </Link>
         </div>
-      )}
+      </div>
 
       <footer className="footer">
         <span className="footerText">FC Thun · Fanverantwortung / SLO</span>
-        <Link className="linkBtn" href="/verwaltung">
-          Verwaltung
-        </Link>
       </footer>
     </div>
   );

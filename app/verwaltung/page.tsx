@@ -2,26 +2,52 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import type { Spiel } from "@/lib/types";
 
-type Teilnehmer = {
+type Ticket = {
   id: string;
-  gegner: string;
+  spiel_id: string;
+  anzahl: number;
+  betrag: number;
+  bezahlt: boolean;
+  bezahlt_am: string | null;
+};
+
+type Person = {
+  id: string;
+  code: string;
+  email: string;
   name: string;
   vorname: string;
-  ausweisnummer: string;
-  erfasst_am: string;
+  adresse: string;
+  plz: string;
+  ort: string;
+  tel: string;
+  daten_erfasst: boolean;
+  angefordert_am: string;
+  erfasst_am: string | null;
+  tickets: Ticket[];
 };
+
+function formatChf(betrag: number): string {
+  return betrag.toLocaleString("de-CH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
 
 export default function Verwaltung() {
   const [passwort, setPasswort] = useState("");
   const [passwortEingabe, setPasswortEingabe] = useState("");
   const [loginFehler, setLoginFehler] = useState("");
-  const [eintraege, setEintraege] = useState<Teilnehmer[]>([]);
-  const [standardGegner, setStandardGegner] = useState("");
-  const [standardEingabe, setStandardEingabe] = useState("");
-  const [standardMeldung, setStandardMeldung] = useState("");
-  const [standardSpeichert, setStandardSpeichert] = useState(false);
-  const [filterGegner, setFilterGegner] = useState<string>("alle");
+
+  const [personen, setPersonen] = useState<Person[]>([]);
+  const [spiele, setSpiele] = useState<Spiel[]>([]);
+  const [preisEingabe, setPreisEingabe] = useState<Record<string, string>>({});
+  const [preisSpeichert, setPreisSpeichert] = useState<Record<string, boolean>>({});
+  const [preisMeldung, setPreisMeldung] = useState<Record<string, string>>({});
+
+  const [nurOffene, setNurOffene] = useState(false);
   const [laedt, setLaedt] = useState(false);
   const [fehler, setFehler] = useState("");
 
@@ -29,19 +55,29 @@ export default function Verwaltung() {
     setLaedt(true);
     setFehler("");
     try {
-      const res = await fetch("/api/verwaltung", {
-        headers: { "x-admin-password": pw },
-      });
-      if (res.status === 401) {
+      const [personenRes, spieleRes] = await Promise.all([
+        fetch("/api/verwaltung", { headers: { "x-admin-password": pw } }),
+        fetch("/api/spiele"),
+      ]);
+      if (personenRes.status === 401) {
         setPasswort("");
         setLoginFehler("Falsches Passwort.");
         return;
       }
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setEintraege(data.teilnehmer ?? []);
-      setStandardGegner(data.standardGegner ?? "");
-      setStandardEingabe(data.standardGegner ?? "");
+      if (!personenRes.ok || !spieleRes.ok) throw new Error();
+      const personenData = await personenRes.json();
+      const spieleData = await spieleRes.json();
+      setPersonen(personenData.personen ?? []);
+      const geladeneSpiele: Spiel[] = spieleData.spiele ?? [];
+      setSpiele(geladeneSpiele);
+      setPreisEingabe(
+        Object.fromEntries(
+          geladeneSpiele.map((s) => [
+            s.id,
+            s.preis_pro_ticket !== null ? String(s.preis_pro_ticket) : "",
+          ])
+        )
+      );
     } catch {
       setFehler("Liste konnte nicht geladen werden.");
     } finally {
@@ -58,31 +94,33 @@ export default function Verwaltung() {
     setPasswort(passwortEingabe);
   };
 
-  const standardSpeichern = async (wert: string) => {
-    setStandardSpeichert(true);
-    setStandardMeldung("");
+  const preisSpeichern = async (spielId: string) => {
+    setPreisSpeichert((alt) => ({ ...alt, [spielId]: true }));
+    setPreisMeldung((alt) => ({ ...alt, [spielId]: "" }));
     try {
-      const res = await fetch("/api/verwaltung", {
-        method: "PUT",
+      const wert = preisEingabe[spielId];
+      const res = await fetch("/api/spiele", {
+        method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           "x-admin-password": passwort,
         },
-        body: JSON.stringify({ gegner: wert }),
+        body: JSON.stringify({
+          id: spielId,
+          preis_pro_ticket: wert.trim() === "" ? null : Number(wert),
+        }),
       });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setStandardGegner(data.standardGegner ?? "");
-      setStandardEingabe(data.standardGegner ?? "");
-      setStandardMeldung(
-        data.standardGegner
-          ? `Standard gesetzt: ${data.standardGegner} – FC Thun`
-          : "Standard entfernt – Teilnehmer geben den Gegner wieder selbst ein."
-      );
-    } catch {
-      setStandardMeldung("Standard konnte nicht gespeichert werden.");
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Speichern fehlgeschlagen.");
+      setSpiele((alt) => alt.map((s) => (s.id === spielId ? data.spiel : s)));
+      setPreisMeldung((alt) => ({ ...alt, [spielId]: "Gespeichert." }));
+    } catch (e) {
+      setPreisMeldung((alt) => ({
+        ...alt,
+        [spielId]: e instanceof Error ? e.message : "Speichern fehlgeschlagen.",
+      }));
     } finally {
-      setStandardSpeichert(false);
+      setPreisSpeichert((alt) => ({ ...alt, [spielId]: false }));
     }
   };
 
@@ -93,40 +131,70 @@ export default function Verwaltung() {
         headers: { "x-admin-password": passwort },
       });
       if (!res.ok) throw new Error();
-      setEintraege((alt) => alt.filter((e) => e.id !== id));
+      setPersonen((alt) => alt.filter((p) => p.id !== id));
     } catch {
       setFehler("Eintrag konnte nicht gelöscht werden.");
     }
   };
 
-  const gegnerListe = Array.from(new Set(eintraege.map((e) => e.gegner))).sort(
-    (a, b) => a.localeCompare(b, "de-CH")
-  );
+  const gesamtbetrag = (p: Person) =>
+    p.tickets.reduce((summe, t) => summe + t.betrag, 0);
 
-  const gefiltert =
-    filterGegner === "alle"
-      ? eintraege
-      : eintraege.filter((e) => e.gegner === filterGegner);
+  const gefiltert = nurOffene
+    ? personen.filter((p) => p.tickets.some((t) => t.anzahl > 0 && !t.bezahlt))
+    : personen;
 
   const csvExport = () => {
-    const kopf = "Spiel;Name;Vorname;Ausweisnummer;Erfasst am";
-    const zeilen = gefiltert.map((e) => {
-      const erfasst = e.erfasst_am
-        ? new Date(e.erfasst_am).toLocaleString("de-CH")
+    const spielKopf = spiele.flatMap((s) => [
+      `${s.gegner} Anzahl`,
+      `${s.gegner} Bezahlt`,
+    ]);
+    const kopf = [
+      "Name",
+      "Vorname",
+      "Adresse",
+      "PLZ",
+      "Ort",
+      "Telefon",
+      "E-Mail",
+      "Code",
+      "Erfasst am",
+      ...spielKopf,
+      "Total CHF",
+    ].join(";");
+
+    const zeilen = gefiltert.map((p) => {
+      const erfasst = p.erfasst_am
+        ? new Date(p.erfasst_am).toLocaleString("de-CH")
         : "";
-      return `${e.gegner} – FC Thun;${e.name};${e.vorname};${e.ausweisnummer};${erfasst}`;
+      const spielSpalten = spiele.flatMap((s) => {
+        const t = p.tickets.find((t) => t.spiel_id === s.id);
+        return [
+          String(t?.anzahl ?? 0),
+          t?.bezahlt ? "ja" : "nein",
+        ];
+      });
+      return [
+        p.name,
+        p.vorname,
+        p.adresse,
+        p.plz,
+        p.ort,
+        p.tel,
+        p.email,
+        p.code,
+        erfasst,
+        ...spielSpalten,
+        formatChf(gesamtbetrag(p)),
+      ].join(";");
     });
-    const csv = "\uFEFF" + [kopf, ...zeilen].join("\r\n"); // BOM für Excel
+
+    const csv = "﻿" + [kopf, ...zeilen].join("\r\n"); // BOM für Excel
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download =
-      filterGegner === "alle"
-        ? "teilnehmerliste-alle-spiele.csv"
-        : `teilnehmerliste-${filterGegner
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")}.csv`;
+    a.download = "uefa-auswaertsfahrten.csv";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -136,7 +204,7 @@ export default function Verwaltung() {
       <div className="ticket">
         <div className="ticketTop">
           <div>
-            <div className="eyebrow">UEFA · Auswärtsfahrt</div>
+            <div className="eyebrow">UEFA · Auswärtsfahrten</div>
             <h1>FC THUN</h1>
           </div>
           <div className="ticketStub">
@@ -145,7 +213,7 @@ export default function Verwaltung() {
           </div>
         </div>
         <div className="perforation" />
-        <p className="ticketSub">Verwaltung der Teilnehmerlisten.</p>
+        <p className="ticketSub">Verwaltung der Registrierungen und Tickets.</p>
       </div>
 
       {!passwort ? (
@@ -166,7 +234,7 @@ export default function Verwaltung() {
           </div>
           <div className="buttonZeile">
             <Link className="secondaryBtn" href="/">
-              Zurück zur Erfassung
+              Zurück zur Startseite
             </Link>
             <button className="primaryBtn" onClick={anmelden}>
               Anmelden
@@ -176,57 +244,52 @@ export default function Verwaltung() {
       ) : (
         <>
           <div className="card" style={{ marginBottom: 20 }}>
-            <h2>Aktuelles Spiel</h2>
-            <p className="hinweis" style={{ marginTop: -8 }}>
-              Ist ein Standard gesetzt, sehen die Teilnehmer den Gegner nur
-              noch als Anzeige und können ihn nicht ändern.
-            </p>
-            <div className="feld">
-              <label htmlFor="standard">Gegnerische Mannschaft</label>
-              <input
-                id="standard"
-                className="input"
-                type="text"
-                value={standardEingabe}
-                onChange={(e) => setStandardEingabe(e.target.value)}
-                placeholder="z. B. Sparta Prag"
-              />
-            </div>
-            {standardMeldung && <p className="hinweis">{standardMeldung}</p>}
-            <div className="buttonZeile">
-              {standardGegner && (
+            <h2>Ticketpreise</h2>
+            {spiele.map((s) => (
+              <div
+                key={s.id}
+                style={{ display: "flex", gap: 10, alignItems: "flex-end", marginBottom: 12 }}
+              >
+                <div className="feld" style={{ marginBottom: 0, flex: 1 }}>
+                  <label htmlFor={`preis-${s.id}`}>
+                    {s.gegner} – {s.heimteam}
+                  </label>
+                  <input
+                    id={`preis-${s.id}`}
+                    className="input"
+                    type="number"
+                    min={0}
+                    step="0.05"
+                    placeholder="CHF"
+                    value={preisEingabe[s.id] ?? ""}
+                    onChange={(e) =>
+                      setPreisEingabe((alt) => ({ ...alt, [s.id]: e.target.value }))
+                    }
+                  />
+                </div>
                 <button
                   className="secondaryBtn"
-                  onClick={() => standardSpeichern("")}
-                  disabled={standardSpeichert}
+                  onClick={() => preisSpeichern(s.id)}
+                  disabled={preisSpeichert[s.id]}
                 >
-                  Standard entfernen
+                  {preisSpeichert[s.id] ? "Speichert …" : "Speichern"}
                 </button>
-              )}
-              <button
-                className="primaryBtn"
-                onClick={() => standardSpeichern(standardEingabe)}
-                disabled={standardSpeichert || !standardEingabe.trim()}
-              >
-                {standardSpeichert
-                  ? "Wird gespeichert …"
-                  : "Als Standard speichern"}
-              </button>
-            </div>
+                {preisMeldung[s.id] && (
+                  <span className="hinweis" style={{ whiteSpace: "nowrap" }}>
+                    {preisMeldung[s.id]}
+                  </span>
+                )}
+              </div>
+            ))}
           </div>
 
           <div className="card">
             <div className="adminKopf">
               <h2>
-                Teilnehmerliste{" "}
-                <span className="anzahl">({gefiltert.length})</span>
+                Personen <span className="anzahl">({gefiltert.length})</span>
               </h2>
               <div className="adminAktionen">
-                <button
-                  className="secondaryBtn"
-                  onClick={() => laden(passwort)}
-                  disabled={laedt}
-                >
+                <button className="secondaryBtn" onClick={() => laden(passwort)} disabled={laedt}>
                   Aktualisieren
                 </button>
                 <button
@@ -239,66 +302,90 @@ export default function Verwaltung() {
               </div>
             </div>
 
-            {gegnerListe.length > 0 && (
-              <div className="feld">
-                <label htmlFor="filter">Spiel filtern</label>
-                <select
-                  id="filter"
-                  className="input"
-                  value={filterGegner}
-                  onChange={(e) => setFilterGegner(e.target.value)}
-                >
-                  <option value="alle">Alle Spiele</option>
-                  {gegnerListe.map((g) => (
-                    <option key={g} value={g}>
-                      {g} – FC Thun
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <div className="feld" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                id="nurOffene"
+                type="checkbox"
+                checked={nurOffene}
+                onChange={(e) => setNurOffene(e.target.checked)}
+              />
+              <label htmlFor="nurOffene" style={{ margin: 0, textTransform: "none" }}>
+                Nur offene Zahlungen anzeigen
+              </label>
+            </div>
 
             {fehler && <div className="fehlerBox">{fehler}</div>}
 
             {laedt ? (
               <p className="hinweis">Liste wird geladen …</p>
             ) : gefiltert.length === 0 ? (
-              <p className="hinweis">
-                Noch keine Teilnehmer erfasst. Sobald sich jemand anmeldet,
-                erscheint der Eintrag hier.
-              </p>
+              <p className="hinweis">Keine Einträge gefunden.</p>
             ) : (
               <div className="tabellenScroll">
                 <table className="tabelle">
                   <thead>
                     <tr>
-                      <th>Spiel</th>
                       <th>Name</th>
-                      <th>Vorname</th>
-                      <th>Ausweisnummer</th>
-                      <th>Erfasst am</th>
+                      <th>Kontakt</th>
+                      <th>Code</th>
+                      <th>Erfasst</th>
+                      {spiele.map((s) => (
+                        <th key={s.id}>{s.gegner}</th>
+                      ))}
+                      <th>Total</th>
                       <th></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {gefiltert.map((e) => (
-                      <tr key={e.id}>
-                        <td style={{ whiteSpace: "nowrap" }}>{e.gegner}</td>
-                        <td>{e.name}</td>
-                        <td>{e.vorname}</td>
-                        <td>{e.ausweisnummer}</td>
+                    {gefiltert.map((p) => (
+                      <tr key={p.id}>
                         <td style={{ whiteSpace: "nowrap" }}>
-                          {e.erfasst_am
-                            ? new Date(e.erfasst_am).toLocaleString("de-CH", {
-                                dateStyle: "short",
-                                timeStyle: "short",
-                              })
-                            : "–"}
+                          {p.vorname} {p.name}
+                          <div className="hinweis" style={{ fontSize: 12 }}>
+                            {p.adresse}, {p.plz} {p.ort}
+                          </div>
+                        </td>
+                        <td>
+                          {p.email}
+                          <div className="hinweis" style={{ fontSize: 12 }}>
+                            {p.tel}
+                          </div>
+                        </td>
+                        <td>{p.code}</td>
+                        <td>
+                          {p.daten_erfasst ? (
+                            "ja"
+                          ) : (
+                            <span style={{ color: "var(--rot)" }}>nein</span>
+                          )}
+                        </td>
+                        {spiele.map((s) => {
+                          const t = p.tickets.find((t) => t.spiel_id === s.id);
+                          if (!t || t.anzahl === 0) {
+                            return <td key={s.id}>–</td>;
+                          }
+                          return (
+                            <td key={s.id} style={{ whiteSpace: "nowrap" }}>
+                              {t.anzahl} × (CHF {formatChf(t.betrag)})
+                              <div
+                                className="hinweis"
+                                style={{
+                                  fontSize: 12,
+                                  color: t.bezahlt ? "#2e8b3d" : "var(--rot)",
+                                }}
+                              >
+                                {t.bezahlt ? "bezahlt" : "offen"}
+                              </div>
+                            </td>
+                          );
+                        })}
+                        <td style={{ whiteSpace: "nowrap", fontWeight: 600 }}>
+                          CHF {formatChf(gesamtbetrag(p))}
                         </td>
                         <td>
                           <button
                             className="deleteBtn"
-                            onClick={() => loeschen(e.id)}
+                            onClick={() => loeschen(p.id)}
                             title="Eintrag löschen"
                           >
                             Löschen
@@ -311,9 +398,12 @@ export default function Verwaltung() {
               </div>
             )}
 
-            <div style={{ marginTop: 20 }}>
+            <div style={{ marginTop: 20, display: "flex", gap: 14 }}>
               <Link className="linkBtn" href="/">
-                ← Zurück zur Erfassung
+                ← Zurück zur Startseite
+              </Link>
+              <Link className="linkBtn" href="/vor-ort">
+                Zur Vor-Ort-Erfassung
               </Link>
             </div>
           </div>
