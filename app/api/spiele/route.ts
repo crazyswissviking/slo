@@ -14,7 +14,7 @@ function istBerechtigt(req: NextRequest): boolean {
 }
 
 // Öffentlich lesbar: Spieldaten inkl. Preis, damit sowohl die
-// Vor-Ort-Erfassung als auch die Verwaltung sie anzeigen können.
+// Ticketerfassung als auch die Verwaltung sie anzeigen können.
 export async function GET() {
   const { data, error } = await supabaseAdmin()
     .from("spiele")

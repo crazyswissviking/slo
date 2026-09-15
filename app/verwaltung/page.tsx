@@ -398,12 +398,9 @@ export default function Verwaltung() {
               </div>
             )}
 
-            <div style={{ marginTop: 20, display: "flex", gap: 14 }}>
+            <div style={{ marginTop: 20 }}>
               <Link className="linkBtn" href="/">
-                ← Zurück zur Startseite
-              </Link>
-              <Link className="linkBtn" href="/vor-ort">
-                Zur Vor-Ort-Erfassung
+                ← Zurück zur Ticketerfassung
               </Link>
             </div>
           </div>

@@ -34,15 +34,3 @@ export type Ticket = {
   bezahlt: boolean;
   bezahlt_am: string | null;
 };
-
-// Personendaten, wie sie über das öffentliche Erfassungsformular
-// eingegeben/geändert werden dürfen.
-export type PersonenEingabe = {
-  name: string;
-  vorname: string;
-  adresse: string;
-  plz: string;
-  ort: string;
-  tel: string;
-  email: string;
-};
