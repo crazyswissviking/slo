@@ -1,15 +1,18 @@
 # FC Thun – UEFA-Auswärtsfahrten: Registrierung & Ticketausgabe
 
-Next.js-App (App Router, TypeScript) mit Supabase als Datenbank und Resend
-für den E-Mail-Versand.
+Next.js-App (App Router, TypeScript) mit Supabase als Datenbank. Kein
+E-Mail-Versand nötig – die Registrierung läuft über einen QR-Code.
 
 ## Ablauf
 
-1. **Zuhause registrieren**: Auf der Startseite (`/`) trägt jede Person ihre
-   E-Mail-Adresse ein und erhält per Mail einen persönlichen Link
-   (`/erfassen/[token]`), um Name, Vorname, Adresse, PLZ, Ort, Telefon und
-   E-Mail selbst zu erfassen. Nach dem Speichern erscheint ein kurzer Code
-   (z. B. `K7H2PQ`), den die Person vor Ort bereithält.
+1. **Registrieren**: Ein QR-Code (Seite `/qr`, für Flyer/Plakate/Social
+   Media) führt zu `/registrieren`. Das legt sofort eine neue, leere Person
+   an und leitet direkt auf deren persönliches Erfassungsformular
+   (`/erfassen/[token]`) weiter – ganz ohne Login oder Mailversand. Dort
+   trägt die Person Name, Vorname, Adresse, PLZ, Ort, Telefon und E-Mail
+   ein. Der Link lässt sich als Lesezeichen speichern, um die Angaben
+   später (z. B. zuhause) zu ergänzen. Nach dem Speichern erscheint ein
+   kurzer Code (z. B. `K7H2PQ`), den die Person vor Ort bereithält.
 2. **Vor Ort** (`/vor-ort`, passwortgeschützt): Der SLO sucht die Person
    anhand des Codes, Namens oder der E-Mail-Adresse und trägt pro Spiel nur
    noch die gewünschte Anzahl Tickets ein. Die App berechnet den Betrag
@@ -33,17 +36,20 @@ Die drei Spiele sind fix in der Datenbank hinterlegt (siehe
   anon-Key komplett gesperrt.
 - Sämtliche Datenbankzugriffe laufen **serverseitig** über Next.js-API-
   Routen mit dem Service-Role-Key. Keys landen nie im Browser.
-- `POST /api/registrierung`: öffentlich – legt eine Person an (oder nutzt
-  den bestehenden Eintrag zur E-Mail wieder) und verschickt den
-  Erfassungslink.
+- `GET /registrieren`: öffentlich – legt eine neue Person an (Token + Code)
+  und leitet auf `/erfassen/[token]` weiter. Jeder Aufruf (= jeder Scan)
+  erzeugt einen neuen Eintrag; unvollständige Mehrfach-Scans lassen sich in
+  der Verwaltung löschen.
 - `GET/PATCH /api/personen/[token]`: öffentlich, aber nur mit dem
-  unerratbaren Token aus der E-Mail nutzbar – das Token wirkt wie ein
+  unerratbaren Token aus dem Link nutzbar – das Token wirkt wie ein
   Passwort für die eigenen Daten.
 - `GET /api/spiele`: öffentlich, liefert nur Spieldaten und Preise (keine
   Personendaten). `PATCH /api/spiele`: admin-geschützt.
 - `GET/POST/PATCH /api/vor-ort`, `GET/DELETE /api/verwaltung`: geschützt
   über das Admin-Passwort (Umgebungsvariable `ADMIN_PASSWORD`, wird als
   Header `x-admin-password` mitgeschickt und nur serverseitig verglichen).
+- `/qr`: erzeugt den QR-Code serverseitig für die aktuelle Domain (kein
+  externer Dienst nötig) und bietet ihn als PNG zum Download an.
 
 ## Einrichtung
 
@@ -59,37 +65,29 @@ Die drei Spiele sind fix in der Datenbank hinterlegt (siehe
 3. Unter **Settings → API** die Project URL und den
    **service_role**-Key kopieren (nicht den anon-Key).
 
-### 2. Resend (E-Mail-Versand)
-
-1. Account auf [resend.com](https://resend.com) erstellen.
-2. Eine Domain verifizieren (DNS-Einträge gemäss Resend-Anleitung) und
-   einen API-Key erzeugen.
-3. `EMAIL_FROM` auf eine Adresse dieser Domain setzen, z. B.
-   `"FC Thun SLO <auswaertsfahrten@dein-domain.ch>"`.
-
-### 3. Lokal starten
+### 2. Lokal starten
 
 ```bash
 npm install
 cp .env.local.example .env.local
-# .env.local ausfüllen: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
-# ADMIN_PASSWORD, RESEND_API_KEY, EMAIL_FROM
+# .env.local ausfüllen: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ADMIN_PASSWORD
 npm run dev
 ```
 
-App: http://localhost:3000 · Vor-Ort: http://localhost:3000/vor-ort ·
+App: http://localhost:3000 · QR-Code: http://localhost:3000/qr ·
+Vor-Ort: http://localhost:3000/vor-ort ·
 Verwaltung: http://localhost:3000/verwaltung
 
-### 4. Deployment auf Vercel
+### 3. Deployment auf Vercel
 
 1. Repository zu GitHub pushen und in Vercel importieren.
 2. Unter **Settings → Environment Variables** eintragen:
    - `SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `ADMIN_PASSWORD`
-   - `RESEND_API_KEY`
-   - `EMAIL_FROM`
-3. Deployen. Fertig.
+3. Deployen.
+4. Nach dem Deployment `/qr` öffnen und den QR-Code herunterladen/drucken –
+   er zeigt automatisch die richtige (produktive) Domain an.
 
 ## Hinweise
 
@@ -106,6 +104,10 @@ Verwaltung: http://localhost:3000/verwaltung
 - **Zahlung**: Die App zeigt den zu zahlenden Betrag nur an – die
   eigentliche TWINT-Zahlung läuft ausserhalb der App (z. B. TWINT-QR-Code
   des Vereins). Der SLO markiert die Zahlung danach manuell als erledigt.
+- **Mehrfach-Scans**: Da jeder Scan des QR-Codes eine neue, leere Person
+  anlegt, können unvollständige Dubletten entstehen (z. B. wenn jemand den
+  Link nicht speichert und später erneut scannt). Diese lassen sich in der
+  Verwaltung erkennen (kein Name/keine Adresse) und löschen.
 - **Datenschutz (DSG)**: Es werden Personendaten (inkl. Adresse und
   Kontaktdaten) erfasst. Empfohlen: Supabase-Region in der Schweiz oder
   EU wählen, Einträge nach Abschluss der Auswärtsfahrten löschen, und die
