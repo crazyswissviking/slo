@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
   const supabase = supabaseAdmin();
 
   const { data: spiele, error: spieleFehler } = await supabase
-    .from("spiele")
+    .from("uefa_spiele")
     .select("id, preis_pro_ticket");
   if (spieleFehler) {
     console.error("Spiele-Fehler:", spieleFehler);

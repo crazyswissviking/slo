@@ -17,7 +17,7 @@ function istBerechtigt(req: NextRequest): boolean {
 // Ticketerfassung als auch die Verwaltung sie anzeigen können.
 export async function GET() {
   const { data, error } = await supabaseAdmin()
-    .from("spiele")
+    .from("uefa_spiele")
     .select("id, gegner, heimteam, datum, preis_pro_ticket, reihenfolge")
     .order("reihenfolge", { ascending: true });
 
@@ -60,7 +60,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   const { data, error } = await supabaseAdmin()
-    .from("spiele")
+    .from("uefa_spiele")
     .update({ preis_pro_ticket: preis })
     .eq("id", id)
     .select("id, gegner, heimteam, datum, preis_pro_ticket, reihenfolge")

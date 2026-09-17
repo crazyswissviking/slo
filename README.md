@@ -25,9 +25,11 @@ Die drei Spiele sind fix in der Datenbank hinterlegt (siehe
 
 ## Architektur / Sicherheit
 
-- Die Supabase-Tabellen `personen`, `spiele` und `tickets` haben **Row Level
-  Security aktiviert, ohne Policies** – sie sind über den öffentlichen
-  anon-Key komplett gesperrt.
+- Die Supabase-Tabellen `personen`, `uefa_spiele` und `tickets` haben **Row
+  Level Security aktiviert, ohne Policies** – sie sind über den
+  öffentlichen anon-Key komplett gesperrt. (Die Tabelle heisst
+  `uefa_spiele` statt `spiele`, da dasselbe Supabase-Projekt auch von der
+  separaten SLO-Verwaltungs-App genutzt wird.)
 - Sämtliche Datenbankzugriffe laufen **serverseitig** über Next.js-API-
   Routen mit dem Service-Role-Key. Keys landen nie im Browser.
 - `GET /api/spiele`: öffentlich, liefert nur Spieldaten und Preise (keine

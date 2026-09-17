@@ -7,13 +7,22 @@
 -- ersten Version der App). Die alten Daten werden dabei
 -- unwiderruflich gelöscht. Das ist so gewollt – die alten
 -- Ausweisnummer-Einträge werden nicht mehr gebraucht.
+--
+-- HINWEIS: Dieses Supabase-Projekt wird auch von einer zweiten,
+-- separaten App (FC Thun SLO-Verwaltung) genutzt. Deren Setup hat
+-- die Tabelle "spiele" auf "uefa_spiele" umbenannt, um eine
+-- Namenskollision zu vermeiden. Diese App (und dieses Script)
+-- verwenden deshalb konsequent "uefa_spiele" statt "spiele".
+-- Dieses Script NICHT einfach neu ausführen, ohne die
+-- drop-Anweisungen zu prüfen – die Produktivdaten liegen bereits
+-- in "uefa_spiele", "personen" und "tickets".
 -- =============================================================
 
 drop table if exists public.teilnehmer cascade;
 drop table if exists public.einstellungen cascade;
 drop table if exists public.tickets cascade;
 drop table if exists public.personen cascade;
-drop table if exists public.spiele cascade;
+drop table if exists public.uefa_spiele cascade;
 
 -- -------------------------------------------------------------
 -- Personen: Stammdaten, einmal zentral erfasst (zuhause per
@@ -42,8 +51,11 @@ create index personen_email_idx on public.personen (lower(email));
 -- -------------------------------------------------------------
 -- Spiele: die 3 UEFA-Auswärtsspiele. Preis pro Ticket ist in
 -- der Verwaltung editierbar (pro Spiel unterschiedlich).
+-- Tabellenname "uefa_spiele" (statt "spiele"), da dasselbe
+-- Supabase-Projekt auch von der separaten SLO-Verwaltungs-App
+-- genutzt wird und der generische Name sonst kollidiert.
 -- -------------------------------------------------------------
-create table public.spiele (
+create table public.uefa_spiele (
   id                text primary key,
   gegner            text not null,
   heimteam          text not null default 'FC Thun',
@@ -52,7 +64,7 @@ create table public.spiele (
   reihenfolge       int not null default 0
 );
 
-insert into public.spiele (id, gegner, heimteam, datum, reihenfolge) values
+insert into public.uefa_spiele (id, gegner, heimteam, datum, reihenfolge) values
   ('twente', 'FC Twente Enschede', 'FC Thun', '2026-10-15T21:00:00+02:00', 1),
   ('ajax',   'Ajax Amsterdam',     'FC Thun', '2026-11-26T18:45:00+01:00', 2),
   ('cska',   'CSKA Sofia',         'FC Thun', '2026-12-17T21:00:00+01:00', 3)
@@ -67,7 +79,7 @@ on conflict (id) do nothing;
 create table public.tickets (
   id             uuid primary key default gen_random_uuid(),
   person_id      uuid not null references public.personen (id) on delete cascade,
-  spiel_id       text not null references public.spiele (id) on delete cascade,
+  spiel_id       text not null references public.uefa_spiele (id) on delete cascade,
   anzahl         int not null default 0 check (anzahl >= 0),
   betrag         numeric(10, 2) not null default 0,
   bezahlt        boolean not null default false,
@@ -83,6 +95,6 @@ create index tickets_spiel_idx on public.tickets (spiel_id);
 -- Dadurch sind die Tabellen über den öffentlichen anon-Key komplett
 -- gesperrt. Sämtliche Zugriffe laufen serverseitig über die
 -- Next.js-API-Routen mit dem Service-Role-Key, der RLS umgeht.
-alter table public.personen enable row level security;
-alter table public.spiele   enable row level security;
-alter table public.tickets  enable row level security;
+alter table public.personen    enable row level security;
+alter table public.uefa_spiele enable row level security;
+alter table public.tickets     enable row level security;
