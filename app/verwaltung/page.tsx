@@ -140,6 +140,19 @@ export default function Verwaltung() {
   const gesamtbetrag = (p: Person) =>
     p.tickets.reduce((summe, t) => summe + t.betrag, 0);
 
+  const ticketsProSpiel = spiele.map((s) => {
+    const zeilen = personen.flatMap((p) =>
+      p.tickets.filter((t) => t.spiel_id === s.id)
+    );
+    return {
+      spiel: s,
+      anzahl: zeilen.reduce((summe, t) => summe + t.anzahl, 0),
+      betrag: zeilen.reduce((summe, t) => summe + t.betrag, 0),
+    };
+  });
+  const ticketsGesamt = ticketsProSpiel.reduce((summe, s) => summe + s.anzahl, 0);
+  const betragGesamt = ticketsProSpiel.reduce((summe, s) => summe + s.betrag, 0);
+
   const gefiltert = nurOffene
     ? personen.filter((p) => p.tickets.some((t) => t.anzahl > 0 && !t.bezahlt))
     : personen;
@@ -281,6 +294,35 @@ export default function Verwaltung() {
                 )}
               </div>
             ))}
+          </div>
+
+          <div className="card" style={{ marginBottom: 20 }}>
+            <h2>Verkaufte Tickets</h2>
+            <div className="tabellenScroll">
+              <table className="tabelle">
+                <thead>
+                  <tr>
+                    <th>Spiel</th>
+                    <th>Tickets</th>
+                    <th>Umsatz</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ticketsProSpiel.map(({ spiel, anzahl, betrag }) => (
+                    <tr key={spiel.id}>
+                      <td>{spiel.gegner}</td>
+                      <td>{anzahl}</td>
+                      <td>CHF {formatChf(betrag)}</td>
+                    </tr>
+                  ))}
+                  <tr style={{ fontWeight: 600 }}>
+                    <td>Total</td>
+                    <td>{ticketsGesamt}</td>
+                    <td>CHF {formatChf(betragGesamt)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div className="card">
